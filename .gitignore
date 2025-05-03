@@ -1,5 +1,5 @@
 # IDE-specific files
-.vscode/
-.idea/
+cuda-kmeans/.vscode/
+cuda-kmeans/.idea/
 *.code-workspace
 
