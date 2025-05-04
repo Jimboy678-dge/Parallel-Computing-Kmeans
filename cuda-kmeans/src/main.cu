@@ -82,13 +82,10 @@ int main() {
         std::cout << "Loaded " << images.size() << " images and " << labels.size() << " labels." << std::endl;
         loader.visImg(3456); // visualize one image given data index, comment if you want
 
-        // initialize runner
-        K000000Runner runner000000 = K000000Runner();
-        //
-
         // [todo g.agluba]
         // get command-line arguments for easier testing ... 
-        //
+        // for now, edit this when testing
+        K000000Runner runner000000 = K000000Runner();
         runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
         
     }
