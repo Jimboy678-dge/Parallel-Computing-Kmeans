@@ -58,6 +58,36 @@ public:
 };
 
 // ADD Extended class here for other kernels
+class K100000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+
+        // Launch the kmeans_100000 kernel
+        kmeans_100000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
 
 
 int main() {
@@ -73,7 +103,6 @@ int main() {
             printCudaDeviceProperties(deviceProp);
         }
 
-
         // Load Data
         MNISTDataLoader loader("./data/MNIST/raw/train-images-idx3-ubyte", "./data/MNIST/raw/train-labels-idx1-ubyte");
         loader.load();
@@ -85,11 +114,16 @@ int main() {
         // [todo g.agluba]
         // get command-line arguments for easier testing ... 
         // for now, edit this when testing
+
+        // Run kmeans_000000
         K000000Runner runner000000 = K000000Runner();
         runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-        
-    }
-    catch (const std::exception& e) {
+
+        // Run kmeans_100000
+        K100000Runner runner100000 = K100000Runner();
+        runner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+
+    } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
