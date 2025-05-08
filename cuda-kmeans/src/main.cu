@@ -76,7 +76,11 @@ int main() {
 
         // Load Data
         MNISTDataLoader loader("./data/MNIST/raw/train-images-idx3-ubyte", "./data/MNIST/raw/train-labels-idx1-ubyte");
-        loader.load();
+        // MNISTDataLoader loader("D:\\Jim\\UP\\MEngg in AI\\CS 239\\Project\\Code\\Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-images-idx3-ubyte",
+        //     "D:\\Jim\\UP\\MEngg in AI\\CS 239\\Project\\Code\\Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-labels-idx1-ubyte" );
+        // MNISTDataLoader loader("Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-images-idx3-ubyte", "Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-labels-idx1-ubyte");
+        // MNISTDataLoader loader("data\\MNIST\\raw\\train-images-idx3-ubyte", "data\\MNIST\\raw\\train-labels-idx1-ubyte");
+        loader.load(); 
         const auto& images = loader.getImages();
         const auto& labels = loader.getLabels();
         std::cout << "Loaded " << images.size() << " images and " << labels.size() << " labels." << std::endl;
