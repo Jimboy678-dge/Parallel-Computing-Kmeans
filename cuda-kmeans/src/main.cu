@@ -75,7 +75,7 @@ int main() {
 
 
         // Load Data
-        MNISTDataLoader loader("./data/MNIST/raw/train-images-idx3-ubyte", "./data/MNIST/raw/train-labels-idx1-ubyte");
+        MNISTDataLoader loader("../data/MNIST/raw/train-images-idx3-ubyte", "../data/MNIST/raw/train-labels-idx1-ubyte");
         loader.load();
         const auto& images = loader.getImages();
         const auto& labels = loader.getLabels();
