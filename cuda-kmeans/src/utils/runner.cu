@@ -3,7 +3,7 @@
 
 const uint8_t DEFAULT_K = 10;
 const int DEFAULT_BLOCK_WIDTH = 32;
-const int MAX_ITERATION = 10000;
+const int MAX_ITERATION = 100;
 
 void BaseRunner::runKernel(
     dim3 dimGrid,
@@ -62,6 +62,7 @@ void BaseRunner::run(
     //     [Note from g.agluba ] use simple kernels for now to test
     size_t memSizeKCluster = N * sizeof(uint8_t);
     uint8_t* K_cluster_d = new uint8_t[memSizeKCluster];
+    cudaMalloc((void**)&K_cluster_d, memSizeKCluster); // [b.matabang note] added allocation here!
     runKernel(dimGrid, dimBlock, images_d, N, IMAGE_HEIGHT, IMAGE_WIDTH, K_cluster_d, DEFAULT_K, centroids_d, MAX_ITERATION);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {

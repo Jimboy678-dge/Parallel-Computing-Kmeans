@@ -11,11 +11,19 @@ __global__ void kmeans_000000(
     int max_iter
 ) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    // printf("number of pixels: %d\n", IMAGE_HEIGHT * IMAGE_WIDTH); // Debugging line
+    // printf("number of clusters: %d\n", K); // Debugging 
+    // printf("K_cluster_d: %d\n", K_cluster_d); // Debugging line
 
     // THIS IS SUPER NAIVE... 
     //    Thinking if I should make more optimized version as baseline.
-
+    // printf("Number of images: %d\n", N); // Debugging line
     for (int iter = 0; iter < max_iter; iter++) {
+        // if (idx > 15000){
+        if (idx < 0){
+            // printf("Thread ID: %d, Iteration: %d\n", idx, iter); // Debugging line
+            // printf("Number of images: %d\n", N);
+        }
         if (idx < N) {
 
             float minDistance = FLT_MAX;
@@ -27,9 +35,10 @@ __global__ void kmeans_000000(
                 for (int i = 0; i < IMAGE_HEIGHT * IMAGE_WIDTH; ++i) {
                     float diff = images_d[idx * IMAGE_HEIGHT * IMAGE_WIDTH + i] - centroids_d[k * IMAGE_HEIGHT * IMAGE_WIDTH + i];
                     distance += diff * diff;
-                    if (k < 2 && i < 2 && iter < 2 && idx < 2) {
+                    // if (k < 10 && i < 2 && iter < 2 && idx < 2) {
+                    if (k < 10 && i < 2 && iter < 2 && idx < 10) {
                         // Debugging line to check the first distance calculation
-                        printf("Distance (global): %f\n, cluster: %d\n pixel: %d\n, iter: %d\n", distance, k, i, iter); // Debugging line
+                        // printf("Distance (global): %f\n, cluster: %d\n pixel: %d\n, iter: %d\n", distance, k, i, iter); // Debugging line
                     }
                 }
                 if (distance < minDistance) {
@@ -322,7 +331,10 @@ __global__ void kmeans_100000(
     int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
 
     for (int iter = 0; iter < max_iter; iter++) {
-
+        if (idx < 2){
+            // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
+        }
+        // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
         // Load centroids into shared memory (by threads cooperatively)
         for (int i = tid; i < K * image_size; i += blockDim.x) {
             shared_centroids[i] = centroids_d[i];
@@ -342,7 +354,7 @@ __global__ void kmeans_100000(
                     if (k < 2 && j < 2  && iter < 2 && idx < 2) {
                         // Debugging line to check the first distance calculation
                         // cout << "Distance (shared): " << distance << endl; // Debugging line
-                        printf("Distance (shared): %f\n, cluster: %d\n pixel: %d\n, iter: %d\n", dist, k, j, iter); // Debugging line
+                        // printf("Distance (shared): %f\n, cluster: %d\n pixel: %d\n, iter: %d\n", dist, k, j, iter); // Debugging line
                     }
                 }
                 if (dist < min_dist) {
