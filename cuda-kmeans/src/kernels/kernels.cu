@@ -69,6 +69,14 @@ __global__ void kmeans_000000(
     }
 }
 
+
+// [J. Escoto notes]
+// The following kernels are from ChatGPT and Copilot, and they are not optimized.
+// This kernel uses shared memory to load centroids, but it is not optimized for performance.
+// The centroids are loaded into shared memory, but the update step is still inefficient.
+// The update step is done in a naive way, which can be improved by using parallel reduction or other techniques.
+// ChatGPT and Copilot have provided different implementations, but they all have similar issues.
+// The centroid updated in the kernel is not efficient, and it can be improved by using parallel reduction or by using another kernel to update the centroids after the assignment step.
 // // from Copilot
 // __global__ void kmeans_100000(
 //     uint8_t* images_d, // Flattened images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
