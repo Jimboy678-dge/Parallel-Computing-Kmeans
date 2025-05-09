@@ -119,9 +119,9 @@ int main() {
         // get command-line arguments for easier testing ... 
         // for now, edit this when testing
 
-        // Run kmeans_000000
-        K000000Runner runner000000 = K000000Runner();
-        runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        // // Run kmeans_000000
+        // K000000Runner runner000000 = K000000Runner();
+        // runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
 
         // Run kmeans_100000
         K100000Runner runner100000 = K100000Runner();
