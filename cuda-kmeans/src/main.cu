@@ -112,56 +112,21 @@ int main() {
         const auto& images = loader.getImages();
         const auto& labels = loader.getLabels();
         std::cout << "Loaded " << images.size() << " images and " << labels.size() << " labels." << std::endl;
-        loader.visImg(3456); // visualize one image given data index, comment if you want
-
-        // [todo g.agluba]
-        // get command-line arguments for easier testing ... 
-        // for now, edit this when testing
-
-        // // Run kmeans_000000
-        // K000000Runner runner000000 = K000000Runner();
-        // runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-
-        // // Run kmeans_100000
-        // K100000Runner runner100000 = K100000Runner();
-        // runner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-        
-        
-        // // Warm-Up Step
-        // std::cout << "Running warm-up..." << std::endl;
-        // K100000Runner warmupRunner = K100000Runner();
-        // warmupRunner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-        // cudaDeviceSynchronize(); // Ensure kernel execution is complete
-        // std::cout << "Warm-up completed." << std::endl;
-
-        // // Timing variables
-        // std::vector<double> execution_times;
-
-        // // Run K100000Runner 5 times
-        // for (int i = 0; i < 5; ++i) {
-        //     K100000Runner runner = K100000Runner();
-        //     auto start = std::chrono::high_resolution_clock::now();
-        //     runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-        //     cudaDeviceSynchronize(); // Ensure kernel execution is complete
-        //     auto end = std::chrono::high_resolution_clock::now();
-        //     std::chrono::duration<double> elapsed = end - start;
-        //     execution_times.push_back(elapsed.count());
-        //     std::cout << "K100000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
-        // }
-
-        // // Calculate and display average execution time
-        // double average_time = std::accumulate(execution_times.begin(), execution_times.end(), 0.0) / execution_times.size();
-        // std::cout << "\nAverage Execution Time for K100000Runner: " << average_time << " seconds" << std::endl;
 
         // Warm-Up Step
         std::cout << "Running warm-up..." << std::endl;
-        K000000Runner warmupRunner = K000000Runner();
-        warmupRunner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        K000000Runner warmupRunner000000 = K000000Runner();
+        warmupRunner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete
+
+        K100000Runner warmupRunner100000 = K100000Runner();
+        warmupRunner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
         cudaDeviceSynchronize(); // Ensure kernel execution is complete
         std::cout << "Warm-up completed." << std::endl;
 
         // Timing variables
-        std::vector<double> execution_times;
+        std::vector<double> k000000_times;
+        std::vector<double> k100000_times;
 
         // Run K000000Runner 5 times
         for (int i = 0; i < 5; ++i) {
@@ -171,13 +136,29 @@ int main() {
             cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
-            execution_times.push_back(elapsed.count());
+            k000000_times.push_back(elapsed.count());
             std::cout << "K000000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
         }
 
-        // Calculate and display average execution time
-        double average_time = std::accumulate(execution_times.begin(), execution_times.end(), 0.0) / execution_times.size();
-        std::cout << "\nAverage Execution Time for K000000Runner: " << average_time << " seconds" << std::endl;
+        // Run K100000Runner 5 times
+        for (int i = 0; i < 5; ++i) {
+            K100000Runner runner = K100000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k100000_times.push_back(elapsed.count());
+            std::cout << "K100000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Calculate and display average execution times
+        double k000000_avg = std::accumulate(k000000_times.begin(), k000000_times.end(), 0.0) / k000000_times.size();
+        double k100000_avg = std::accumulate(k100000_times.begin(), k100000_times.end(), 0.0) / k100000_times.size();
+
+        std::cout << "\nAverage Execution Time:" << std::endl;
+        std::cout << "K000000Runner: " << k000000_avg << " seconds" << std::endl;
+        std::cout << "K100000Runner: " << k100000_avg << " seconds" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
