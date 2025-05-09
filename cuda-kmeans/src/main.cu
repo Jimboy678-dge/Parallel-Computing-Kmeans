@@ -1,5 +1,8 @@
 #include <iostream>
 #include <filesystem>
+#include <chrono> // For timing
+#include <vector> // For storing execution times
+#include <numeric> // For calculating averages
 #include "utils/mnist_dataloader.h"
 #include "utils/runner.cuh"
 #include "utils/utils.cuh"
@@ -95,9 +98,9 @@ int main() {
         // Device Properties
         int deviceCount;
         cudaGetDeviceCount(&deviceCount);
-        cout << "Device Count\t" << deviceCount << endl;
+        std::cout << "Device Count\t" << deviceCount << std::endl;
 
-        for (int device = 0; device < deviceCount;device++) {
+        for (int device = 0; device < deviceCount; device++) {
             cudaDeviceProp deviceProp;
             cudaGetDeviceProperties(&deviceProp, device);
             printCudaDeviceProperties(deviceProp);
@@ -105,11 +108,7 @@ int main() {
 
         // Load Data
         MNISTDataLoader loader("../data/MNIST/raw/train-images-idx3-ubyte", "../data/MNIST/raw/train-labels-idx1-ubyte");
-        // MNISTDataLoader loader("D:\\Jim\\UP\\MEngg in AI\\CS 239\\Project\\Code\\Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-images-idx3-ubyte",
-        //     "D:\\Jim\\UP\\MEngg in AI\\CS 239\\Project\\Code\\Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-labels-idx1-ubyte" );
-        // MNISTDataLoader loader("Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-images-idx3-ubyte", "Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-labels-idx1-ubyte");
-        // MNISTDataLoader loader("data\\MNIST\\raw\\train-images-idx3-ubyte", "data\\MNIST\\raw\\train-labels-idx1-ubyte");
-        loader.load(); 
+        loader.load();
         const auto& images = loader.getImages();
         const auto& labels = loader.getLabels();
         std::cout << "Loaded " << images.size() << " images and " << labels.size() << " labels." << std::endl;
@@ -123,9 +122,35 @@ int main() {
         // K000000Runner runner000000 = K000000Runner();
         // runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
 
-        // Run kmeans_100000
-        K100000Runner runner100000 = K100000Runner();
-        runner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        // // Run kmeans_100000
+        // K100000Runner runner100000 = K100000Runner();
+        // runner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+
+        // Warm-Up Step
+        std::cout << "Running warm-up..." << std::endl;
+        K100000Runner warmupRunner = K100000Runner();
+        warmupRunner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete
+        std::cout << "Warm-up completed." << std::endl;
+
+        // Timing variables
+        std::vector<double> execution_times;
+
+        // Run K100000Runner 5 times
+        for (int i = 0; i < 5; ++i) {
+            K100000Runner runner = K100000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            execution_times.push_back(elapsed.count());
+            std::cout << "K100000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Calculate and display average execution time
+        double average_time = std::accumulate(execution_times.begin(), execution_times.end(), 0.0) / execution_times.size();
+        std::cout << "\nAverage Execution Time for K100000Runner: " << average_time << " seconds" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
