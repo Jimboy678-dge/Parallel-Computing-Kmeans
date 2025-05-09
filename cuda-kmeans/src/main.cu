@@ -7,7 +7,7 @@
 #include "cuda_runtime.h"
 
 const uint8_t DEFAULT_IMAGE_WIDTH = 28; // MNIST images are 28x28
-const uint8_t DEFAULT_IMAGE_HEIGTH = 28;
+const uint8_t DEFAULT_IMAGE_HEIGHT = 28;
 
 
 // [Note from g.agluba to all],
@@ -57,6 +57,36 @@ public:
     }
 };
 
+
+class K001000Runner : public BaseRunner {
+    public:
+        void runKernel(
+            dim3 dimGrid,
+            dim3 dimBlock,
+            // [g.agluba note] 
+            // typically use float, but since most data are positive int, will make unsigned int to reduce memory
+            uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
+            size_t N, // number of images = 6000?
+            uint8_t IMAGE_HEIGHT, // image height = 28
+            uint8_t IMAGE_WIDTH, // image width = 28
+            uint8_t* K_cluster_d, // array to hold K cluster label
+            uint8_t K, // k-means parameter
+            float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+            int max_iter
+        ) {
+            kmeans_001000 << <dimGrid, dimBlock >> > (
+                images_d,
+                N,
+                IMAGE_HEIGHT,
+                IMAGE_WIDTH,
+                K_cluster_d,
+                K,
+                centroids_d,
+                max_iter
+            );
+        }
+    };
+
 // ADD Extended class here for other kernels
 
 
@@ -85,8 +115,13 @@ int main() {
         // [todo g.agluba]
         // get command-line arguments for easier testing ... 
         // for now, edit this when testing
-        K000000Runner runner000000 = K000000Runner();
-        runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        K001000Runner runner001000 = K001000Runner();
+        runner001000.run(images, images.size(), DEFAULT_IMAGE_HEIGHT, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize();
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("CUDA error: %s\n", cudaGetErrorString(err));
+        }
         
     }
     catch (const std::exception& e) {
