@@ -27,6 +27,34 @@ const uint8_t DEFAULT_IMAGE_HEIGHT = 28;
 //      K101000 mean optimized kernel with shared memory and loop unrolling
 //      ...
 
+class WarmupRunner : public BaseRunner {
+    public:
+        void runKernel(
+            dim3 dimGrid,
+            dim3 dimBlock,
+            // [b.matabang note]
+            // warmup kernel with max_iter = 1 
+            uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
+            size_t N, // number of images = 6000?
+            uint8_t IMAGE_HEIGHT, // image height = 28
+            uint8_t IMAGE_WIDTH, // image width = 28
+            uint8_t* K_cluster_d, // array to hold K cluster label
+            uint8_t K, // k-means parameter
+            float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+            int max_iter
+        ) {
+            kmeans_000000 << <dimGrid, dimBlock >> > (
+                images_d,
+                N,
+                IMAGE_HEIGHT,
+                IMAGE_WIDTH,
+                K_cluster_d,
+                K,
+                centroids_d,
+                2 // [b.matabang note] set max_iter to 2 for warmup
+            );
+        }
+    };
 
 class K000000Runner : public BaseRunner {
 public:
@@ -63,8 +91,6 @@ class K001000Runner : public BaseRunner {
         void runKernel(
             dim3 dimGrid,
             dim3 dimBlock,
-            // [g.agluba note] 
-            // typically use float, but since most data are positive int, will make unsigned int to reduce memory
             uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
             size_t N, // number of images = 6000?
             uint8_t IMAGE_HEIGHT, // image height = 28
@@ -87,6 +113,34 @@ class K001000Runner : public BaseRunner {
         }
     };
 
+class K101000Runner : public BaseRunner {
+    public:
+        void runKernel(
+            dim3 dimGrid,
+            dim3 dimBlock,
+            uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
+            size_t N, // number of images = 6000?
+            uint8_t IMAGE_HEIGHT, // image height = 28
+            uint8_t IMAGE_WIDTH, // image width = 28
+            uint8_t* K_cluster_d, // array to hold K cluster label
+            uint8_t K, // k-means parameter
+            float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+            int max_iter
+        ) {
+            int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
+            int shared_mem_bytes = K * image_size * sizeof(float); // shared memory for centroids
+            kmeans_101000<<<dimGrid, dimBlock, shared_mem_bytes>>>(
+                images_d,
+                N,
+                IMAGE_HEIGHT,
+                IMAGE_WIDTH,
+                K_cluster_d,
+                K,
+                centroids_d,
+                max_iter
+            );
+    }
+};
 // ADD Extended class here for other kernels
 
 
@@ -110,19 +164,38 @@ int main() {
         const auto& images = loader.getImages();
         const auto& labels = loader.getLabels();
         std::cout << "Loaded " << images.size() << " images and " << labels.size() << " labels." << std::endl;
-        loader.visImg(3456); // visualize one image given data index, comment if you want
 
-        // [todo g.agluba]
-        // get command-line arguments for easier testing ... 
-        // for now, edit this when testing
-        K001000Runner runner001000 = K001000Runner();
-        runner001000.run(images, images.size(), DEFAULT_IMAGE_HEIGHT, DEFAULT_IMAGE_WIDTH, labels);
+        // Warmup kernel
+        WarmupRunner warmuprunner000000 = WarmupRunner();
+        warmuprunner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGHT, DEFAULT_IMAGE_WIDTH, labels);
         cudaDeviceSynchronize();
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess) {
             printf("CUDA error: %s\n", cudaGetErrorString(err));
         }
+        std::cout << "Warmup kernel executed successfully." << std::endl;
+
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start);
         
+        // Run the kernel
+        K001000Runner runner001000 = K001000Runner();
+        runner001000.run(images, images.size(), DEFAULT_IMAGE_HEIGHT, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize();
+        if (err != cudaSuccess) {
+            printf("CUDA error: %s\n", cudaGetErrorString(err));
+        }
+        cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+
+        float milliseconds = 0;
+        cudaEventElapsedTime(&milliseconds, start, stop);
+        std::cout << "Kernel execution time: " << milliseconds / 1000 << " seconds" << std::endl;
+
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
     }
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

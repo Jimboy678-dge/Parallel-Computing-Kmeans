@@ -29,6 +29,17 @@ __global__ void kmeans_001000(
     int max_iter
 ); 
 
+__global__ void kmeans_101000(
+    uint8_t* images_d,
+    size_t N,
+    uint8_t IMAGE_HEIGHT,
+    uint8_t IMAGE_WIDTH,
+    uint8_t* K_cluster_d,
+    uint8_t K,
+    float* centroids_d,
+    int max_iter
+);
+
 // Add other kernel definitions
 
 #endif // KERNELS_H

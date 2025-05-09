@@ -54,9 +54,8 @@ void BaseRunner::run(
     dim3 dimGrid(gridSizeX); // maximize number
     dim3 dimBlock(DEFAULT_BLOCK_WIDTH);
 
-    // [TODO: bdmatabang]
-    // Perform some initial warmup, accessing the device.
-    //   Add any kernel that access the device memory
+    // [4.5] Warmup kernel
+    // Warmup kernel moved to main.cu for clearer kernel time measurement
 
     // [5] Allocate memory for result uint8_t* K_cluster, run kernel and copy result to K_cluster
     //     [Note from g.agluba ] use simple kernels for now to test
@@ -78,7 +77,6 @@ void BaseRunner::run(
     free(flattenedImages); free(centroids);free(K_cluster);
     
 };
-
 
 // Initializing K*IMAGE_HEIGHT*IMAGE_WIDTH centroids
 float* BaseRunner::initCentroids(

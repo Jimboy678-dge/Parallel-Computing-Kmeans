@@ -164,3 +164,86 @@ __global__ void kmeans_001000(
     }
 }
 
+__global__ void kmeans_101000(
+    uint8_t* images_d,
+    size_t N,
+    uint8_t IMAGE_HEIGHT,
+    uint8_t IMAGE_WIDTH,
+    uint8_t* K_cluster_d,
+    uint8_t K,
+    float* centroids_d,
+    int max_iter
+) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
+
+    extern __shared__ float shared_centroids[]; // Dynamic shared memory
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        // Load centroids to shared memory
+        int shared_idx = threadIdx.x;
+        while (shared_idx < K * image_size) {
+            shared_centroids[shared_idx] = centroids_d[shared_idx];
+            shared_idx += blockDim.x;
+        }
+        __syncthreads(); // Ensure all threads loaded the centroids
+
+        if (idx < N) {
+            float minDistance = FLT_MAX;
+            uint8_t bestCluster = 0;
+
+            for (int k = 0; k < K; k++) {
+                float distance = 0.0f;
+                int i = 0;
+                int base_img = idx * image_size;
+                int base_cen = k * image_size;
+
+                // Unrolled loop
+                for (; i + 3 < image_size; i += 4) {
+                    float diff0 = images_d[base_img + i] - shared_centroids[base_cen + i];
+                    float diff1 = images_d[base_img + i + 1] - shared_centroids[base_cen + i + 1];
+                    float diff2 = images_d[base_img + i + 2] - shared_centroids[base_cen + i + 2];
+                    float diff3 = images_d[base_img + i + 3] - shared_centroids[base_cen + i + 3];
+                    distance += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+                }
+                for (; i < image_size; i++) {
+                    float diff = images_d[base_img + i] - shared_centroids[base_cen + i];
+                    distance += diff * diff;
+                }
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestCluster = k;
+                }
+            }
+
+            K_cluster_d[idx] = bestCluster;
+        }
+
+        __syncthreads();
+
+        // Update step remains unchanged here (global memory)
+        // You could use shared memory here too, but be careful about memory limits and atomicity
+        if (idx < K) {
+            float newCentroid[784] = {0};
+            int clusterSize = 0;
+
+            for (int i = 0; i < N; ++i) {
+                if (K_cluster_d[i] == idx) {
+                    for (int j = 0; j < image_size; ++j) {
+                        newCentroid[j] += images_d[i * image_size + j];
+                    }
+                    clusterSize++;
+                }
+            }
+
+            for (int j = 0; j < image_size; ++j) {
+                centroids_d[idx * image_size + j] = clusterSize > 0 ? newCentroid[j] / clusterSize : centroids_d[idx * image_size + j];
+            }
+        }
+
+        __syncthreads();
+    }
+}
+
+
