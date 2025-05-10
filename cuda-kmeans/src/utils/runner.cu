@@ -3,7 +3,7 @@
 
 const uint8_t DEFAULT_K = 10;
 const int DEFAULT_BLOCK_WIDTH = 32;
-const int MAX_ITERATION = 100;
+const int MAX_ITERATION = 10;
 
 void BaseRunner::runKernel(
     dim3 dimGrid,
@@ -34,11 +34,11 @@ void BaseRunner::run(
     // [1] Process inputs and initialize arbitrary centroids
     size_t memSizeImages = N * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(uint8_t);
     uint8_t* flattenedImages = flattenImages(images, N, IMAGE_HEIGHT, IMAGE_WIDTH);
-    visImage(flattenedImages, N, IMAGE_HEIGHT, IMAGE_WIDTH, 3456);
+    // visImage(flattenedImages, N, IMAGE_HEIGHT, IMAGE_WIDTH, 3456);
 
     size_t memSizeCentroids = DEFAULT_K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
     float* centroids = initCentroids(12345, DEFAULT_K, IMAGE_HEIGHT, IMAGE_WIDTH);
-    visCentroids(centroids, DEFAULT_K, IMAGE_HEIGHT, IMAGE_WIDTH, 5);
+    // visCentroids(centroids, DEFAULT_K, IMAGE_HEIGHT, IMAGE_WIDTH, 5);
 
     // [2] Implement code to allocate cuda memory  for images and centroids
     uint8_t* images_d; float* centroids_d;
