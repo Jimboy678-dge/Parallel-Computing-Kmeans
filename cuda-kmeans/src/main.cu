@@ -28,7 +28,7 @@ const int DEFAULT_REPLICATION = 3;
 // 
 // Assuming we have 6 optimization (we can always change this),
 //      K000000 means unoptimized code running based kernel kmeans_000000
-//      K100000 means optimized kernel with shared memory kmeans_100000, kmeans_X00000 X>1 for any other variants
+//      K400200 means optimized kernel with shared memory kmeans_400200, kmeans_X00000 X>1 for any other variants
 //      K101000 mean optimized kernel with shared memory and loop unrolling
 //      ...
 
@@ -63,7 +63,7 @@ public:
 };
 
 // ADD Extended class here for other kernels
-class K100000Runner : public BaseRunner {
+class K400200Runner : public BaseRunner {
 public:
     void runKernel(
         dim3 dimGrid,
@@ -93,8 +93,8 @@ public:
         cudaMemset(K_cluster_d_sum, 0.0f, memSizeClusterSums);
         cudaMemset(K_d_count, 0, memSizeClusterCount);
 
-        // Launch the kmeans_100000 kernel
-        kmeans_100000<<<dimGrid, dimBlock, sharedMemorySize >>>(
+        // Launch the kmeans_400200 kernel
+        kmeans_400200<<<dimGrid, dimBlock, sharedMemorySize >>>(
             images_d,
             N,
             IMAGE_HEIGHT,
@@ -136,14 +136,14 @@ int main() {
         warmupRunner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels, 1);
         cudaDeviceSynchronize(); // Ensure kernel execution is complete
 
-        K100000Runner warmupRunner100000 = K100000Runner();
-        warmupRunner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels, 1);
+        K400200Runner warmupRunner400200 = K400200Runner();
+        warmupRunner400200.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels, 1);
         cudaDeviceSynchronize(); // Ensure kernel execution is complete
         std::cout << "Warm-up completed." << std::endl;
 
         // Timing variables
         std::vector<double> k000000_times;
-        std::vector<double> k100000_times;
+        std::vector<double> k400200_times;
 
         
 
@@ -159,25 +159,25 @@ int main() {
             std::cout << "K000000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
         }
 
-        // Run K100000Runner 5 times
+        // Run K400200Runner 5 times
         for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
-            K100000Runner runner = K100000Runner();
+            K400200Runner runner = K400200Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
             //cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
-            k100000_times.push_back(elapsed.count());
-            std::cout << "K100000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+            k400200_times.push_back(elapsed.count());
+            std::cout << "K400200Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
         }
 
         // Calculate and display average execution times
         double k000000_avg = std::accumulate(k000000_times.begin(), k000000_times.end(), 0.0) / k000000_times.size();
-        double k100000_avg = std::accumulate(k100000_times.begin(), k100000_times.end(), 0.0) / k100000_times.size();
+        double k400200_avg = std::accumulate(k400200_times.begin(), k400200_times.end(), 0.0) / k400200_times.size();
 
         std::cout << "\nAverage Execution Time:" << std::endl;
         std::cout << "K000000Runner: " << k000000_avg << " seconds" << std::endl;
-        std::cout << "K100000Runner: " << k100000_avg << " seconds" << std::endl;
+        std::cout << "K400200Runner: " << k400200_avg << " seconds" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

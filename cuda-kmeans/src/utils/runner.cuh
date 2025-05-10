@@ -7,7 +7,7 @@
 #include "cuda_runtime.h"
 #include "vector"
 
-const int MAX_ITERATION = 10;
+const int MAX_ITERATION = 100;
 
 // Base Runner Class to run kernels, to avoid code redundancy
 class BaseRunner {
