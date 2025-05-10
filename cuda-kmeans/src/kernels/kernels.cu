@@ -414,13 +414,16 @@ __global__ void kmeans_200000(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
 
-    for (int iter = 0; iter < max_iter; iter++) {
-        if (idx < N) {
+    if (idx < N) {
             // Load the current thread's image to shared memory (1 image per block)
             for (int i = tid; i < image_size; i += blockDim.x) {
                 shared_image[i] = images_d[idx * image_size + i];
             }
             __syncthreads();
+    }
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        if (idx < N) {
 
             float minDistance = FLT_MAX;
             uint8_t bestCluster = 0;
@@ -485,15 +488,17 @@ __global__ void kmeans_300000(
     // Shared memory for 32 images
     extern __shared__ uint8_t shared_images[];
 
-    for (int iter = 0; iter < max_iter; iter++) {
-        // Load 32 images into shared memory
-        if (tid < images_per_block && global_image_idx < N) {
-            for (int i = 0; i < image_size; ++i) {
-                shared_images[tid * image_size + i] =
-                    images_d[global_image_idx * image_size + i];
-            }
+    // Load 32 images into shared memory
+    if (tid < images_per_block && global_image_idx < N) {
+        for (int i = 0; i < image_size; ++i) {
+            shared_images[tid * image_size + i] =
+                images_d[global_image_idx * image_size + i];
         }
-        __syncthreads();
+    }
+    __syncthreads();
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        
 
         // Each thread assigns one image to the nearest cluster
         if (tid < images_per_block && global_image_idx < N) {
