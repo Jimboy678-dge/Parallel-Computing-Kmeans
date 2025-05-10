@@ -1,5 +1,8 @@
 #include <iostream>
 #include <filesystem>
+#include <chrono> // For timing
+#include <vector> // For storing execution times
+#include <numeric> // For calculating averages
 #include "utils/mnist_dataloader.h"
 #include "utils/runner.cuh"
 #include "utils/utils.cuh"
@@ -58,6 +61,101 @@ public:
 };
 
 // ADD Extended class here for other kernels
+class K100000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+
+        // Launch the kmeans_100000 kernel
+        kmeans_100000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
+
+class K200000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        // size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+        size_t sharedMemorySize = IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(uint8_t);
+
+        // Launch the kmeans_200000 kernel
+        kmeans_200000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
+
+class K300000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        // size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+        const int images_per_block = 32;
+        size_t sharedMemorySize = images_per_block * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(uint8_t);
+
+        // Launch the kmeans_300000 kernel
+        kmeans_300000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
 
 
 int main() {
@@ -65,38 +163,107 @@ int main() {
         // Device Properties
         int deviceCount;
         cudaGetDeviceCount(&deviceCount);
-        cout << "Device Count\t" << deviceCount << endl;
+        std::cout << "Device Count\t" << deviceCount << std::endl;
 
-        for (int device = 0; device < deviceCount;device++) {
+        for (int device = 0; device < deviceCount; device++) {
             cudaDeviceProp deviceProp;
             cudaGetDeviceProperties(&deviceProp, device);
             printCudaDeviceProperties(deviceProp);
         }
 
-
         // Load Data
-        MNISTDataLoader loader("./data/MNIST/raw/train-images-idx3-ubyte", "./data/MNIST/raw/train-labels-idx1-ubyte");
-        // MNISTDataLoader loader("D:\\Jim\\UP\\MEngg in AI\\CS 239\\Project\\Code\\Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-images-idx3-ubyte",
-        //     "D:\\Jim\\UP\\MEngg in AI\\CS 239\\Project\\Code\\Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-labels-idx1-ubyte" );
-        // MNISTDataLoader loader("Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-images-idx3-ubyte", "Parallel-Computing-Kmeans\\cuda-kmeans\\data\\MNIST\\raw\\train-labels-idx1-ubyte");
-        // MNISTDataLoader loader("data\\MNIST\\raw\\train-images-idx3-ubyte", "data\\MNIST\\raw\\train-labels-idx1-ubyte");
-        loader.load(); 
+        MNISTDataLoader loader("../data/MNIST/raw/train-images-idx3-ubyte", "../data/MNIST/raw/train-labels-idx1-ubyte");
+        loader.load();
         const auto& images = loader.getImages();
         const auto& labels = loader.getLabels();
         std::cout << "Loaded " << images.size() << " images and " << labels.size() << " labels." << std::endl;
-        loader.visImg(3456); // visualize one image given data index, comment if you want
 
-        // initialize runner
-        K000000Runner runner000000 = K000000Runner();
-        //
+        // Warm-Up Step
+        std::cout << "Running warm-up..." << std::endl;
+        K000000Runner warmupRunner000000 = K000000Runner();
+        warmupRunner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete
 
-        // [todo g.agluba]
-        // get command-line arguments for easier testing ... 
-        //
-        runner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-        
-    }
-    catch (const std::exception& e) {
+        K100000Runner warmupRunner100000 = K100000Runner();
+        warmupRunner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete
+
+        K200000Runner warmupRunner200000 = K200000Runner();
+        warmupRunner200000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete
+
+        K300000Runner warmupRunner300000 = K300000Runner();
+        warmupRunner300000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete
+        std::cout << "Warm-up completed." << std::endl;
+
+        // Timing variables
+        std::vector<double> k000000_times;
+        std::vector<double> k100000_times;
+        std::vector<double> k200000_times;
+        std::vector<double> k300000_times;
+
+        // Run K000000Runner 5 times
+        for (int i = 0; i < 5; ++i) {
+            K000000Runner runner = K000000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k000000_times.push_back(elapsed.count());
+            std::cout << "K000000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Run K100000Runner 5 times
+        for (int i = 0; i < 5; ++i) {
+            K100000Runner runner = K100000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k100000_times.push_back(elapsed.count());
+            std::cout << "K100000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Run K200000Runner 5 times
+        for (int i = 0; i < 5; ++i) {
+            K200000Runner runner = K200000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k200000_times.push_back(elapsed.count());
+            std::cout << "K200000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Run K300000Runner 5 times
+        for (int i = 0; i < 5; ++i) {
+            K300000Runner runner = K300000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k300000_times.push_back(elapsed.count());
+            std::cout << "K300000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Calculate and display average execution times
+        double k000000_avg = std::accumulate(k000000_times.begin(), k000000_times.end(), 0.0) / k000000_times.size();
+        double k100000_avg = std::accumulate(k100000_times.begin(), k100000_times.end(), 0.0) / k100000_times.size();
+        double k200000_avg = std::accumulate(k200000_times.begin(), k200000_times.end(), 0.0) / k200000_times.size();
+        double k300000_avg = std::accumulate(k300000_times.begin(), k300000_times.end(), 0.0) / k300000_times.size();
+
+        std::cout << "\nAverage Execution Time:" << std::endl;
+        std::cout << "K000000Runner: " << k000000_avg << " seconds" << std::endl;
+        std::cout << "K100000Runner: " << k100000_avg << " seconds" << std::endl;
+        std::cout << "K200000Runner: " << k200000_avg << " seconds" << std::endl;
+        std::cout << "K300000Runner: " << k300000_avg << " seconds" << std::endl;
+
+    } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
