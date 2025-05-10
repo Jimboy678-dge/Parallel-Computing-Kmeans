@@ -336,9 +336,14 @@ __global__ void kmeans_100000(
         }
         // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
         // Load centroids into shared memory (by threads cooperatively)
-        for (int i = tid; i < K * image_size; i += blockDim.x) {
+        /*for (int i = tid; i < K * image_size; i += blockDim.x) {
+            shared_centroids[i] = centroids_d[i];
+        }*/
+        // More optimize [distributed to all threads == griDim.x * blockDim.x]
+        for (int i = idx; i < K * image_size; i += gridDim.x * blockDim.x) {
             shared_centroids[i] = centroids_d[i];
         }
+
         __syncthreads();
 
         // Step 1: Assign images to nearest cluster
