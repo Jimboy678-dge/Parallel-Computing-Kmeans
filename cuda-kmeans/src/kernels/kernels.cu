@@ -390,3 +390,148 @@ __global__ void kmeans_100000(
         __syncthreads();
     }
 }
+
+// 1 image per block
+// from ChatGPT
+__global__ void kmeans_200000(
+    uint8_t* images_d,
+    size_t N,
+    uint8_t IMAGE_HEIGHT,
+    uint8_t IMAGE_WIDTH,
+    uint8_t* K_cluster_d,
+    uint8_t K,
+    float* centroids_d,
+    int max_iter
+) {
+    extern __shared__ uint8_t shared_image[]; // Shared memory for one image per block
+
+    int tid = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        if (idx < N) {
+            // Load the current thread's image to shared memory (1 image per block)
+            for (int i = tid; i < image_size; i += blockDim.x) {
+                shared_image[i] = images_d[idx * image_size + i];
+            }
+            __syncthreads();
+
+            float minDistance = FLT_MAX;
+            uint8_t bestCluster = 0;
+
+            for (int k = 0; k < K; k++) {
+                float distance = 0.0f;
+                for (int j = 0; j < image_size; ++j) {
+                    float diff = static_cast<float>(shared_image[j]) - centroids_d[k * image_size + j];
+                    distance += diff * diff;
+                }
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestCluster = k;
+                }
+            }
+
+            K_cluster_d[idx] = bestCluster;
+        }
+        __syncthreads();
+
+        // Update step (naive version)
+        if (idx < K) {
+            float newCentroid[784] = {0};
+            int clusterSize = 0;
+
+            for (int i = 0; i < N; ++i) {
+                if (K_cluster_d[i] == idx) {
+                    for (int j = 0; j < image_size; ++j) {
+                        newCentroid[j] += static_cast<float>(images_d[i * image_size + j]);
+                    }
+                    clusterSize++;
+                }
+            }
+
+            for (int j = 0; j < image_size; ++j) {
+                if (clusterSize > 0)
+                    centroids_d[idx * image_size + j] = newCentroid[j] / clusterSize;
+            }
+        }
+        __syncthreads();
+    }
+}
+
+// 32 images per block
+// from ChatGPT
+__global__ void kmeans_300000(
+    uint8_t* images_d,
+    size_t N,
+    uint8_t IMAGE_HEIGHT,
+    uint8_t IMAGE_WIDTH,
+    uint8_t* K_cluster_d,
+    uint8_t K,
+    float* centroids_d,
+    int max_iter
+) {
+    const int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
+    const int images_per_block = 32;
+    const int tid = threadIdx.x;
+    const int block_image_idx = blockIdx.x * images_per_block;
+    const int global_image_idx = block_image_idx + tid;
+
+    // Shared memory for 32 images
+    extern __shared__ uint8_t shared_images[];
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        // Load 32 images into shared memory
+        if (tid < images_per_block && global_image_idx < N) {
+            for (int i = 0; i < image_size; ++i) {
+                shared_images[tid * image_size + i] =
+                    images_d[global_image_idx * image_size + i];
+            }
+        }
+        __syncthreads();
+
+        // Each thread assigns one image to the nearest cluster
+        if (tid < images_per_block && global_image_idx < N) {
+            float min_dist = FLT_MAX;
+            uint8_t best_cluster = 0;
+
+            for (int k = 0; k < K; ++k) {
+                float dist = 0.0f;
+                for (int j = 0; j < image_size; ++j) {
+                    float diff = static_cast<float>(
+                        shared_images[tid * image_size + j]) -
+                        centroids_d[k * image_size + j];
+                    dist += diff * diff;
+                }
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    best_cluster = k;
+                }
+            }
+            K_cluster_d[global_image_idx] = best_cluster;
+        }
+        __syncthreads();
+
+        // Update centroids (one thread per centroid)
+        if (global_image_idx < K) {
+            float new_centroid[784] = {0};
+            int count = 0;
+            for (int i = 0; i < N; ++i) {
+                if (K_cluster_d[i] == global_image_idx) {
+                    for (int j = 0; j < image_size; ++j) {
+                        new_centroid[j] += static_cast<float>(
+                            images_d[i * image_size + j]);
+                    }
+                    count++;
+                }
+            }
+
+            for (int j = 0; j < image_size; ++j) {
+                if (count > 0)
+                    centroids_d[global_image_idx * image_size + j] =
+                        new_centroid[j] / count;
+            }
+        }
+        __syncthreads();
+    }
+}
