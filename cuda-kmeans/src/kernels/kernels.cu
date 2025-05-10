@@ -476,16 +476,19 @@ __global__ void kmeans_400200(
         //__syncthreads();
 
         // REUSE shared_centroids for partial sums
-        // Initialize partial counts
-        if (idx < K * image_size) {
-            shared_centroids[idx] = 0.0f;
+        // Initialize partial sum and counts, collabaratively within the block
+        for (int i = tid; i < K * image_size; i += blockDim.x) {
+            shared_centroids[i] = 0.0f;
         }
-        if (idx < K) {
-            shared_count[idx] = 0;
+        __syncthreads();
+        if (tid < K) {
+            shared_count[tid] = 0;
         }
         __syncthreads();
 
         // Accumulate local sums and counts in shared memory
+        // 32 threads/block should be negligble for atomicAdd
+        // Intra-Block Summation
         if (idx < N) {
             for (int i = 0;i < image_size;++i) {
                 atomicAdd(&shared_count[best_cluster], 1);
@@ -495,19 +498,20 @@ __global__ void kmeans_400200(
         __syncthreads();
 
         // Global Reduction
-        // Accumulate all centroid sums/counts with global memory
-        if (idx < K * image_size) {
-            atomicAdd(&K_cluster_d_sum[idx], shared_centroids[idx]);
+        // Accumulate all centroid sums/counts with global memory (collaboratively over block)
+        for (int i = tid; i < K * image_size; i += blockDim.x) {
+            atomicAdd(&K_cluster_d_sum[i], shared_centroids[i]);
         }
-        if (idx < K) {
-            atomicAdd(&K_d_count[idx], shared_count[idx]);
+        __syncthreads();
+        if (tid < K) {
+            atomicAdd(&K_d_count[tid], shared_count[tid]);
         }
         __syncthreads();
 
         // Update centroids
-        // Update new centroids with sum over counts
+        // Update new centroids with sum over counts (collaboratively over all threads)
         if (idx < K * image_size) {
-            centroids_d[idx] = K_cluster_d_sum[idx] / K_d_count[idx];
+            centroids_d[idx] = K_cluster_d_sum[idx] / K_d_count[idx/image_size];
         }
 
     }
