@@ -492,7 +492,7 @@ __global__ void kmeans_400200(
         if (idx < N) {
             for (int i = 0;i < image_size;++i) {
                 atomicAdd(&shared_count[best_cluster], 1);
-                atomicAdd(&shared_centroids[best_cluster * image_size + i], 1);
+                atomicAdd(&shared_centroids[best_cluster * image_size + i], images_d[idx * image_size + i]);
             }
         }
         __syncthreads();
