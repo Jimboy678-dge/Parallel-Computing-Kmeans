@@ -1,4 +1,5 @@
 #include "kernels.cuh"
+#include <device_atomic_functions.h>
 
 __global__ void kmeans_000000(
     uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
@@ -322,29 +323,150 @@ __global__ void kmeans_100000(
     uint8_t* K_cluster_d,
     uint8_t K,
     float* centroids_d,
+    float* K_cluster_d_sum,
+    int* K_d_count,
     int max_iter
 ) {
     extern __shared__ float shared_centroids[];
+    extern __shared__ int shared_count[];
 
     int tid = threadIdx.x;
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
 
     for (int iter = 0; iter < max_iter; iter++) {
-        if (idx < 2){
+        if (idx < 2) {
             // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
         }
         // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
         // Load centroids into shared memory (by threads cooperatively)
-        /*for (int i = tid; i < K * image_size; i += blockDim.x) {
-            shared_centroids[i] = centroids_d[i];
-        }*/
-        // More optimize [distributed to all threads == griDim.x * blockDim.x]
-        for (int i = idx; i < K * image_size; i += gridDim.x * blockDim.x) {
+        for (int i = tid; i < K * image_size; i += blockDim.x) {
             shared_centroids[i] = centroids_d[i];
         }
 
         __syncthreads();
+
+        // Step 1: Assign images to nearest cluster
+        float min_dist = FLT_MAX;
+        uint8_t best_cluster = 0;
+        if (idx < N) {
+            for (int k = 0; k < K; ++k) {
+                float dist = 0.0f;
+                for (int j = 0; j < image_size; ++j) {
+                    float diff = static_cast<float>(images_d[idx * image_size + j]) - shared_centroids[k * image_size + j];
+                    dist += diff * diff;
+                }
+                /*if (dist < min_dist) {
+                    min_dist = dist;
+                    best_cluster = k;
+                }*/
+                bool flag = (dist < min_dist);
+                min_dist = flag ? dist : min_dist;
+                best_cluster = flag ? k : best_cluster;
+            }
+
+            K_cluster_d[idx] = best_cluster;
+        }
+        __syncthreads();
+
+        // Step 2: Update centroids (one block handles all clusters)
+        //if (idx < K) {
+        //    float new_centroid[784] = { 0.0f }; // Assumes max image size
+        //    int count = 0;
+
+        //    for (int i = 0; i < N; ++i) {
+        //        if (K_cluster_d[i] == idx) {
+        //            for (int j = 0; j < image_size; ++j) {
+        //                new_centroid[j] += static_cast<float>(images_d[i * image_size + j]);
+        //            }
+        //            count++;
+        //        }
+        //    }
+
+        //    for (int j = 0; j < image_size; ++j) {
+        //        if (count > 0)
+        //            centroids_d[idx * image_size + j] = new_centroid[j] / count;
+        //        // else keep previous value
+        //    }
+        //}
+        //__syncthreads();
+        
+        // REUSE shared_centroids for partial sums
+        // Initialize partial counts
+        if (idx < K*image_size) {
+            shared_centroids[idx] = 0.0f;
+        }
+        if (idx < K) {
+            shared_count[idx] = 0;
+        }
+        __syncthreads();
+
+        // Accumulate local sums
+        if (idx < N) {
+            for (int i = 0;i < image_size;++i) {
+                atomicAdd(&shared_count[best_cluster], 1);
+                atomicAdd(&shared_centroids[best_cluster*image_size+i], 1);
+            }
+        }
+        __syncthreads();
+
+        // Global Reduction
+        if (idx < K * image_size) {
+            atomicAdd(&K_cluster_d_sum[idx], shared_centroids[idx]);
+        }
+        if (idx < K) {
+            atomicAdd(&K_d_count[idx], shared_count[idx]);
+        }
+        __syncthreads();
+
+        // Update centroids
+        if (idx < K * image_size) {
+            centroids_d[idx] = K_cluster_d_sum[idx] / K_d_count[idx];
+        }
+
+    }
+};
+
+
+__global__ void kmeans_400000(
+    uint8_t* images_d,
+    size_t N,
+    uint8_t IMAGE_HEIGHT,
+    uint8_t IMAGE_WIDTH,
+    uint8_t* K_cluster_d,
+    uint8_t K,
+    float* centroids_d,
+    int max_iter
+) {
+    // extern __shared__ float shared_centroids[];
+
+    int tid = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int image_size = IMAGE_HEIGHT * IMAGE_WIDTH;
+
+
+    // Shared memory for 32 images
+    extern __shared__ uint8_t shared_images[];
+    if (tid < 32 && idx < N) {
+        for (int i = 0; i < image_size; ++i) {
+            shared_images[tid * image_size + i] =
+                images_d[idx * image_size + i];
+        }
+    }
+    __syncthreads();
+
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        //if (idx < 2) {
+        //    // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
+        //}
+        // printf("Thread ID: %d, Iteration: %d\n", tid, iter); // Debugging line
+        // Load centroids into shared memory (by threads cooperatively)
+       /* for (int i = tid; i < K * image_size; i += blockDim.x) {
+            shared_centroids[i] = centroids_d[i];
+        }*/
+
+
 
         // Step 1: Assign images to nearest cluster
         if (idx < N) {
@@ -354,13 +476,8 @@ __global__ void kmeans_100000(
             for (int k = 0; k < K; ++k) {
                 float dist = 0.0f;
                 for (int j = 0; j < image_size; ++j) {
-                    float diff = static_cast<float>(images_d[idx * image_size + j]) - shared_centroids[k * image_size + j];
+                    float diff = static_cast<float>(images_d[idx * image_size + j]) - centroids_d[k * image_size + j];
                     dist += diff * diff;
-                    if (k < 2 && j < 2  && iter < 2 && idx < 2) {
-                        // Debugging line to check the first distance calculation
-                        // cout << "Distance (shared): " << distance << endl; // Debugging line
-                        // printf("Distance (shared): %f\n, cluster: %d\n pixel: %d\n, iter: %d\n", dist, k, j, iter); // Debugging line
-                    }
                 }
                 if (dist < min_dist) {
                     min_dist = dist;

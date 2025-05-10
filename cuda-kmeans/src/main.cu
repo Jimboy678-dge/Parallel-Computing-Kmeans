@@ -12,6 +12,8 @@
 const uint8_t DEFAULT_IMAGE_WIDTH = 28; // MNIST images are 28x28
 const uint8_t DEFAULT_IMAGE_HEIGTH = 28;
 
+const int DEFAULT_REPLICATION = 3;
+
 
 // [Note from g.agluba to all],
 // Please check Runner / Kernel Naming convention
@@ -76,10 +78,23 @@ public:
         int max_iter
     ) {
         // Calculate shared memory size for centroids
-        size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+        size_t sharedMemorySize = (K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float)) +
+            (K * sizeof(int));
+
+
+        // Allocate memory for global sums and counts
+        size_t memSizeClusterSums = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+        size_t memSizeClusterCount = K * sizeof(int);
+
+        int* K_d_count; float* K_cluster_d_sum;
+        cudaMalloc((void**)&K_cluster_d_sum, memSizeClusterSums);
+        cudaMalloc((void**)&K_d_count, memSizeClusterCount);
+
+        cudaMemset(K_cluster_d_sum, 0.0f, memSizeClusterSums);
+        cudaMemset(K_d_count, 0, memSizeClusterCount);
 
         // Launch the kmeans_100000 kernel
-        kmeans_100000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+        kmeans_100000<<<dimGrid, dimBlock, sharedMemorySize >>>(
             images_d,
             N,
             IMAGE_HEIGHT,
@@ -87,6 +102,8 @@ public:
             K_cluster_d,
             K,
             centroids_d,
+            K_cluster_d_sum,
+            K_d_count,
             max_iter
         );
     }
@@ -116,11 +133,11 @@ int main() {
         // Warm-Up Step
         std::cout << "Running warm-up..." << std::endl;
         K000000Runner warmupRunner000000 = K000000Runner();
-        warmupRunner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        warmupRunner000000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels, 1);
         cudaDeviceSynchronize(); // Ensure kernel execution is complete
 
         K100000Runner warmupRunner100000 = K100000Runner();
-        warmupRunner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+        warmupRunner100000.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels, 1);
         cudaDeviceSynchronize(); // Ensure kernel execution is complete
         std::cout << "Warm-up completed." << std::endl;
 
@@ -128,12 +145,14 @@ int main() {
         std::vector<double> k000000_times;
         std::vector<double> k100000_times;
 
+        
+
         // Run K000000Runner 5 times
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
             K000000Runner runner = K000000Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             k000000_times.push_back(elapsed.count());
@@ -141,11 +160,11 @@ int main() {
         }
 
         // Run K100000Runner 5 times
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
             K100000Runner runner = K100000Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             k100000_times.push_back(elapsed.count());

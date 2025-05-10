@@ -1,9 +1,10 @@
 #include "runner.cuh"
+#include "chrono"
 #include <random>
+#include <iostream>
 
 const uint8_t DEFAULT_K = 10;
 const int DEFAULT_BLOCK_WIDTH = 32;
-const int MAX_ITERATION = 100;
 
 void BaseRunner::runKernel(
     dim3 dimGrid,
@@ -29,16 +30,17 @@ void BaseRunner::run(
     size_t N, // number of images = 6000?
     uint8_t IMAGE_HEIGHT, // image height = 28
     uint8_t IMAGE_WIDTH, // image width = 28
-    std::vector<uint8_t> labels //not really needed but why not?
+    std::vector<uint8_t> labels, //not really needed but why not?
+    int max_iter
 ) {
     // [1] Process inputs and initialize arbitrary centroids
     size_t memSizeImages = N * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(uint8_t);
     uint8_t* flattenedImages = flattenImages(images, N, IMAGE_HEIGHT, IMAGE_WIDTH);
-    visImage(flattenedImages, N, IMAGE_HEIGHT, IMAGE_WIDTH, 3456);
+    //visImage(flattenedImages, N, IMAGE_HEIGHT, IMAGE_WIDTH, 3456);
 
     size_t memSizeCentroids = DEFAULT_K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
     float* centroids = initCentroids(12345, DEFAULT_K, IMAGE_HEIGHT, IMAGE_WIDTH);
-    visCentroids(centroids, DEFAULT_K, IMAGE_HEIGHT, IMAGE_WIDTH, 5);
+    //visCentroids(centroids, DEFAULT_K, IMAGE_HEIGHT, IMAGE_WIDTH, 5);
 
     // [2] Implement code to allocate cuda memory  for images and centroids
     uint8_t* images_d; float* centroids_d;
@@ -63,7 +65,15 @@ void BaseRunner::run(
     size_t memSizeKCluster = N * sizeof(uint8_t);
     uint8_t* K_cluster_d = new uint8_t[memSizeKCluster];
     cudaMalloc((void**)&K_cluster_d, memSizeKCluster); // [b.matabang note] added allocation here!
-    runKernel(dimGrid, dimBlock, images_d, N, IMAGE_HEIGHT, IMAGE_WIDTH, K_cluster_d, DEFAULT_K, centroids_d, MAX_ITERATION);
+
+    auto start = std::chrono::high_resolution_clock::now();
+    runKernel(dimGrid, dimBlock, images_d, N, IMAGE_HEIGHT, IMAGE_WIDTH, K_cluster_d, DEFAULT_K, centroids_d, max_iter);
+    cudaDeviceSynchronize();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "Kernel RuntimeTime " << elapsed.count() << std::endl;
+    
+    
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("CUDA Error: %s\n", cudaGetErrorString(err));
