@@ -7,6 +7,8 @@
 #include "cuda_runtime.h"
 #include "vector"
 
+const int MAX_ITERATION = 100;
+
 // Base Runner Class to run kernels, to avoid code redundancy
 class BaseRunner {
 public:
@@ -26,22 +28,14 @@ public:
         int max_iter
     );
 
-    // COMMON
-    
-    void runwarmup(
-        std::vector<std::vector<uint8_t>> images,
-        size_t N, // number of images = 6000?
-        uint8_t IMAGE_HEIGHT, // image height = 28
-        uint8_t IMAGE_WIDTH, // image width = 28
-        std::vector<uint8_t> labels //not really needed but why not?
-    );
-
+    // COMMON 
     void run(
         std::vector<std::vector<uint8_t>> images,
         size_t N, // number of images = 6000?
         uint8_t IMAGE_HEIGHT, // image height = 28
         uint8_t IMAGE_WIDTH, // image width = 28
-        std::vector<uint8_t> labels //not really needed but why not?
+        std::vector<uint8_t> labels, //not really needed but why not?
+        int max_iter = MAX_ITERATION
     );
 
     float* initCentroids(
