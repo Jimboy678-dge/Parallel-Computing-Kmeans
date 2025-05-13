@@ -164,6 +164,15 @@ __global__ void kmeans_001000(
     }
 }
 
+
+// SHARED MEMORY + LOOP UNROLLING OPTIMIZATION 101000
+// [b.matabang notes]
+// This kernel is a more optimized version using SHARED MEMORY AND LOOP UNROLLING
+// Known Issues:
+// Ran Slower than running without shared memory (001000)
+// Possible Fixes:
+// <Needs further review>
+
 __global__ void kmeans_101000(
     uint8_t* images_d,
     size_t N,
