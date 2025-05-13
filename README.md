@@ -16,7 +16,9 @@ In main.cu, it is recommended to review the actual path called by MNISTDataLoade
 .\kmeans.exe
 ```
 
-## INITIAL RESULTS FROM BDM (100 iterations, Ave. of 5 Runs):
-K000000 : 168.601 seconds
-K001000 : 102.212 seconds
-K101000 : 169.480 seconds (needs review)
+## INITIAL RESULTS FROM BDM (100 iterations, Ave. of 3 Runs):
+CPURunner: 543.231 seconds <br>
+K000000Runner: 174.02 seconds <br>
+K001000Runner: 102.297 seconds <br>
+K400200Runner: 5.02361 seconds <br>
+K401200Runner: 5.06317 seconds
