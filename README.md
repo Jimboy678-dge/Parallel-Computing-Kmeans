@@ -17,8 +17,13 @@ In main.cu, it is recommended to review the actual path called by MNISTDataLoade
 ```
 
 ## INITIAL RESULTS FROM BDM (100 iterations, Ave. of 3 Runs):
-CPURunner: 543.231 seconds <br>
-K000000Runner: 174.02 seconds <br>
+CPURunner: 592.942 seconds <br>
+K000000Runner: 166.631 seconds <br>
+K100000Runner: 173.236 seconds <br>
+K200000Runner: 167.001 seconds <br>
+K300000Runner: 167.276 seconds <br>
 K001000Runner: 102.297 seconds <br>
 K400200Runner: 5.02361 seconds <br>
 K401200Runner: 5.06317 seconds
+
+

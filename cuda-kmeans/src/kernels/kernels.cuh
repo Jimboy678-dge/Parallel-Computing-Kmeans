@@ -28,7 +28,31 @@ __global__ void kmeans_100000(
     uint8_t K, // k-means parameter
     float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
     int max_iter
-);
+); 
+
+// 1 image per block in shared memory
+__global__ void kmeans_200000(
+    uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
+    size_t N, // number of images = 6000?
+    uint8_t IMAGE_HEIGHT, // image height = 28
+    uint8_t IMAGE_WIDTH, // image width = 28
+    uint8_t* K_cluster_d, // array to hold K cluster label
+    uint8_t K, // k-means parameter
+    float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+    int max_iter
+); 
+
+// 32 images per block in shared memory
+__global__ void kmeans_300000(
+    uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
+    size_t N, // number of images = 6000?
+    uint8_t IMAGE_HEIGHT, // image height = 28
+    uint8_t IMAGE_WIDTH, // image width = 28
+    uint8_t* K_cluster_d, // array to hold K cluster label
+    uint8_t K, // k-means parameter
+    float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+    int max_iter
+); 
 
 __global__ void kmeans_001000(
     uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
@@ -38,6 +62,17 @@ __global__ void kmeans_001000(
     uint8_t* K_cluster_d, // array to hold K cluster label
     uint8_t K, // k-means parameter
     float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+    int max_iter
+);
+
+__global__ void kmeans_101000(
+    uint8_t* images_d,
+    size_t N,
+    uint8_t IMAGE_HEIGHT,
+    uint8_t IMAGE_WIDTH,
+    uint8_t* K_cluster_d,
+    uint8_t K,
+    float* centroids_d,
     int max_iter
 );
 

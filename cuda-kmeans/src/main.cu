@@ -62,6 +62,102 @@ public:
     }
 };
 
+class K100000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+
+        // Launch the kmeans_100000 kernel
+        kmeans_100000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
+
+class K200000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        // size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+        size_t sharedMemorySize = IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(uint8_t);
+
+        // Launch the kmeans_200000 kernel
+        kmeans_200000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
+
+class K300000Runner : public BaseRunner {
+public:
+    void runKernel(
+        dim3 dimGrid,
+        dim3 dimBlock,
+        uint8_t* images_d,
+        size_t N,
+        uint8_t IMAGE_HEIGHT,
+        uint8_t IMAGE_WIDTH,
+        uint8_t* K_cluster_d,
+        uint8_t K,
+        float* centroids_d,
+        int max_iter
+    ) {
+        // Calculate shared memory size for centroids
+        // size_t sharedMemorySize = K * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(float);
+        const int images_per_block = 32;
+        size_t sharedMemorySize = images_per_block * IMAGE_HEIGHT * IMAGE_WIDTH * sizeof(uint8_t);
+
+        // Launch the kmeans_300000 kernel
+        kmeans_300000<<<dimGrid, dimBlock, sharedMemorySize>>>(
+            images_d,
+            N,
+            IMAGE_HEIGHT,
+            IMAGE_WIDTH,
+            K_cluster_d,
+            K,
+            centroids_d,
+            max_iter
+        );
+    }
+};
+
 class K001000Runner : public BaseRunner {
     public:
         void runKernel(
@@ -88,6 +184,34 @@ class K001000Runner : public BaseRunner {
             );
         }
     };
+
+class K101000Runner : public BaseRunner {
+    public:
+        void runKernel(
+            dim3 dimGrid,
+            dim3 dimBlock,
+            uint8_t* images_d, //flatten images of size N X IMAGE_HEIGHT X IMAGE_WIDTH
+            size_t N, // number of images = 6000?
+            uint8_t IMAGE_HEIGHT, // image height = 28
+            uint8_t IMAGE_WIDTH, // image width = 28
+            uint8_t* K_cluster_d, // array to hold K cluster label
+            uint8_t K, // k-means parameter
+            float* centroids_d, // flatten centroids of size K X IMAGE_HEIGHT X IMAGE_WIDTH
+            int max_iter
+        ) {
+            kmeans_101000 << <dimGrid, dimBlock >> > (
+                images_d,
+                N,
+                IMAGE_HEIGHT,
+                IMAGE_WIDTH,
+                K_cluster_d,
+                K,
+                centroids_d,
+                max_iter
+            );
+        }
+    };
+
 
 
 class K400200Runner : public BaseRunner {
@@ -272,54 +396,103 @@ int main() {
         // Timing variables
         std::vector<double> cpu_times;
         std::vector<double> k000000_times;
+        std::vector<double> k100000_times;
+        std::vector<double> k200000_times;
+        std::vector<double> k300000_times;
         std::vector<double> k001000_times;
+        std::vector<double> k101000_times;
         std::vector<double> k400200_times;
         std::vector<double> k401200_times;
 
-        // Run CPUversion 5 times
+      // Run CPUversion 5 times
         for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
-            std::vector<std::vector<float>> imagez(images.size(), std::vector<float>(IMAGE_HEIGHT * IMAGE_WIDTH));
-            std::vector<std::vector<float>> centroidz(10, std::vector<float>(IMAGE_HEIGHT * IMAGE_WIDTH));
-            std::vector<uint8_t> K_clusterz(images.size());
+        std::vector<std::vector<float>> imagez(images.size(), std::vector<float>(IMAGE_HEIGHT * IMAGE_WIDTH));
+        std::vector<std::vector<float>> centroidz(10, std::vector<float>(IMAGE_HEIGHT * IMAGE_WIDTH));
+        std::vector<uint8_t> K_clusterz(images.size());
             auto start = std::chrono::high_resolution_clock::now();
             kmeans_cpu(imagez, centroidz, K_clusterz, 10, 100);
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             cpu_times.push_back(elapsed.count());
             std::cout << "CPURunner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
-        }
-
-
+       }
         // Run K000000Runner 5 times
         for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
             K000000Runner runner = K000000Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             k000000_times.push_back(elapsed.count());
             std::cout << "K000000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
         }
 
-        // Run K001000Runner 5 times
+        // Run K100000Runner 5 times
+        for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
+            K100000Runner runner = K100000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k100000_times.push_back(elapsed.count());
+            std::cout << "K100000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Run K200000Runner 5 times
+        for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
+            K200000Runner runner = K200000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k200000_times.push_back(elapsed.count());
+            std::cout << "K200000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+        // Run K300000Runner 5 times
+        for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
+            K300000Runner runner = K300000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k300000_times.push_back(elapsed.count());
+            std::cout << "K300000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+      // Run K001000Runner 5 times
         for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
             K001000Runner runner = K001000Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             k001000_times.push_back(elapsed.count());
             std::cout << "K001000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
         }
 
-        // Run K400200Runner 5 times
+      // Run K101000Runner 5 times
+        for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
+            K101000Runner runner = K101000Runner();
+            auto start = std::chrono::high_resolution_clock::now();
+            runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            k101000_times.push_back(elapsed.count());
+            std::cout << "K101000Runner Run " << i + 1 << ": " << elapsed.count() << " seconds" << std::endl;
+        }
+
+      // Run K400200Runner 5 times
         for (int i = 0; i < DEFAULT_REPLICATION; ++i) {
             K400200Runner runner = K400200Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             k400200_times.push_back(elapsed.count());
@@ -331,7 +504,7 @@ int main() {
             K401200Runner runner = K401200Runner();
             auto start = std::chrono::high_resolution_clock::now();
             runner.run(images, images.size(), DEFAULT_IMAGE_HEIGTH, DEFAULT_IMAGE_WIDTH, labels);
-            //cudaDeviceSynchronize(); // Ensure kernel execution is complete
+            cudaDeviceSynchronize(); // Ensure kernel execution is complete
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             k401200_times.push_back(elapsed.count());
@@ -341,13 +514,21 @@ int main() {
         // Calculate and display average execution times
         double cpu_avg = std::accumulate(cpu_times.begin(), cpu_times.end(), 0.0) / cpu_times.size();
         double k000000_avg = std::accumulate(k000000_times.begin(), k000000_times.end(), 0.0) / k000000_times.size();
+        double k100000_avg = std::accumulate(k100000_times.begin(), k100000_times.end(), 0.0) / k100000_times.size();
+        double k200000_avg = std::accumulate(k200000_times.begin(), k200000_times.end(), 0.0) / k200000_times.size();
+        double k300000_avg = std::accumulate(k300000_times.begin(), k300000_times.end(), 0.0) / k300000_times.size();
         double k001000_avg = std::accumulate(k001000_times.begin(), k001000_times.end(), 0.0) / k001000_times.size();
+        double k101000_avg = std::accumulate(k101000_times.begin(), k101000_times.end(), 0.0) / k101000_times.size();
         double k400200_avg = std::accumulate(k400200_times.begin(), k400200_times.end(), 0.0) / k400200_times.size();
         double k401200_avg = std::accumulate(k401200_times.begin(), k401200_times.end(), 0.0) / k401200_times.size();
         std::cout << "\nAverage Execution Time:" << std::endl;
         std::cout << "CPURunner: " << cpu_avg << " seconds" << std::endl;
         std::cout << "K000000Runner: " << k000000_avg << " seconds" << std::endl;
+        std::cout << "K100000Runner: " << k100000_avg << " seconds" << std::endl;
+        std::cout << "K200000Runner: " << k200000_avg << " seconds" << std::endl;
+        std::cout << "K300000Runner: " << k300000_avg << " seconds" << std::endl;
         std::cout << "K001000Runner: " << k001000_avg << " seconds" << std::endl;
+        std::cout << "K101000Runner: " << k101000_avg << " seconds" << std::endl;
         std::cout << "K400200Runner: " << k400200_avg << " seconds" << std::endl;
         std::cout << "K401200Runner: " << k401200_avg << " seconds" << std::endl;
 
