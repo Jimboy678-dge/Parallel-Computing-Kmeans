@@ -23,6 +23,7 @@ K100000Runner: 173.236 seconds <br>
 K200000Runner: 167.001 seconds <br>
 K300000Runner: 167.276 seconds <br>
 K001000Runner: 102.297 seconds <br>
+K101000Runner: 169.48 seconds <br>
 K400200Runner: 5.02361 seconds <br>
 K401200Runner: 5.06317 seconds
 
